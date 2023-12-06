@@ -1,0 +1,22 @@
+{
+  "name": "paw-point-js",
+  "version": "0.0.0",
+  "description": "PawPointJS",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "author": {
+    "name": ""
+  },
+  "devDependencies": {
+    "eslint": "^8.21.0",
+    "nodemon": "^3.0.2"
+  },
+  "eslintConfig": {},
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "telegraf": "^4.15.3"
+  }
+}
