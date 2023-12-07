@@ -1,18 +1,26 @@
-const { Telegraf, Markup } = require('telegraf');
+// ÐšÐ¾Ð½Ñ„Ð¸Ð³ÑƒÑ€Ð°Ñ†Ð¸Ñ
+
+const { Telegraf, Markup } = require("telegraf");
+
 const sqlite3 = require('sqlite3').verbose();
-requere('dotenv').config();
+require('dotenv').config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
+const MODERS_LIST = [
+    +process.env.CONTARO,
+    +process.env.BRAKOVAN,
+    +process.env.ASKH,
+    +process.env.SIGMA,
+    +process.env.WIROTENSHI
+]
 
-// Ïîäêëþ÷åíèå ê áàçå äàííûõ SQLite
 const db = new sqlite3.Database('./data/database.db', sqlite3.OPEN_READWRITE, (err) => {
     if (err) {
         console.error(err.message);
     }
-    console.log('Connected to the database.');
 });
 
-// Ñîçäàíèå òàáëèöû, åñëè îíà íå ñóùåñòâóåò
+
 db.run(`CREATE TABLE IF NOT EXISTS photos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -24,25 +32,89 @@ db.run(`CREATE TABLE IF NOT EXISTS photos (
     username TEXT
 )`);
 
-// Ñòàðò áîòà è áàçîâàÿ ëîãèêà
+// Ð¡Ñ‚Ð°Ñ€Ñ‚. ÐÐ´Ð¼Ð¸Ð½Ð°Ð¼ Ð´Ð¾Ð±Ð°Ð²Ð»ÑÑŽÑ‚ÑÑ ÐºÐ½Ð¾Ð¿ÐºÐ¸
+
 bot.start((ctx) => {
     const user_id = ctx.from.id;
     if (MODERS_LIST.includes(user_id)) {
         const keyboard = Markup.keyboard([
-            ['??? Ìîäåðàöèÿ', '??? Î÷èñòèòü ôîòîãðàôèè'],
-            ['?? Èíôîðìàöèÿ î ÁÄ']
+            ['ðŸ›¡ï¸ ÐœÐ¾Ð´ÐµÑ€Ð°Ñ†Ð¸Ñ', 'ðŸ—‘ï¸ ÐžÑ‡Ð¸ÑÑ‚Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾Ð³Ñ€Ð°Ñ„Ð¸Ð¸'],
+            ['ðŸ“ Ð˜Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸Ñ Ð¾ Ð‘Ð”'] 
         ]).resize();
-        ctx.reply(`Ïðèâåò, àäìèíèñòðàòîð ${ctx.from.first_name}!`, keyboard);
+        ctx.reply(`ÐŸÑ€Ð¸Ð²ÐµÑ‚, Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€ ${ctx.from.first_name}!`, keyboard);
     } else {
-        ctx.reply(`Ïðèâåò, ${ctx.from.first_name}! Åñëè âû õîòèòå ïîäåëèòüñÿ ôîòîãðàôèåé óëè÷íîãî æèâîòíîãî, òî ÿ æäó!`);
+        ctx.reply(`ÐŸÑ€Ð¸Ð²ÐµÑ‚, ${ctx.from.first_name}! Ð•ÑÐ»Ð¸ Ð²Ñ‹ Ñ…Ð¾Ñ‚Ð¸Ñ‚Ðµ Ð¿Ð¾Ð´ÐµÐ»Ð¸Ñ‚ÑŒÑÑ Ñ„Ð¾Ñ‚Ð¾Ð³Ñ€Ð°Ñ„Ð¸ÐµÐ¹ ÑƒÐ»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¶Ð¸Ð²Ð¾Ñ‚Ð½Ð¾Ð³Ð¾, Ñ‚Ð¾ Ñ Ð¶Ð´Ñƒ!`);
     }
 });
 
-// Äîïîëíèòåëüíûå îáðàáîò÷èêè ñîáûòèé (commands, hears, on, action è ò.ä.)
+bot.hears('ðŸ›¡ï¸ ÐœÐ¾Ð´ÐµÑ€Ð°Ñ†Ð¸Ñ', async (ctx) => start_moderating(ctx));
+bot.hears('ðŸ—‘ï¸ ÐžÑ‡Ð¸ÑÑ‚Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾Ð³Ñ€Ð°Ñ„Ð¸Ð¸', async (ctx) => cleanup(ctx));
+bot.hears('ðŸ“ Ð˜Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸Ñ Ð¾ Ð‘Ð”', async (ctx) => get_info(ctx));
 
-// Ôóíêöèè äëÿ ðàáîòû ñ áàçîé äàííûõ
+function start_moderation(ctx) {
+    moderate(ctx.from.id);
+}
 
-// Çàïóñê ïîëëèíãà äëÿ áîòà
+function get_info(ctx) {
+    const user_id = ctx.from.id;
+    if (MODERS_LIST.includes(user_id)) {
+        db.run()
+    }
+}
+function cleanup(ctx) {
+    const user_id = ctx.from.id;
+    if (MODERS_LIST.includes(user_id)) {
+        db.run("UPDATE photos SET status = 'deleted' WHERE status = 'edit'");
+        ctx.reply('ÐžÑ‡Ð¸ÑÑ‚ÐºÐ° ÑƒÑÐ¿ÐµÑˆÐ½Ð¾ Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð°');
+    } else {
+        ctx.reply('Ð£ Ð²Ð°Ñ Ð½ÐµÑ‚ Ð¿Ñ€Ð°Ð² Ð´Ð»Ñ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ñ ÑÑ‚Ð¾Ð¹ ÐºÐ¾Ð¼Ð°Ð½Ð´Ñ‹.');
+    }
+}
+
+// Ð¤ÑƒÐ½ÐºÑ†Ð¸Ñ Ð´Ð»Ñ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ñ Ð·Ð°Ð¿Ñ€Ð¾ÑÐ° Ð¸ Ð¿Ð¾Ð»ÑƒÑ‡ÐµÐ½Ð¸Ñ Ñ€ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚Ð¾Ð²
+function getDatabaseInfo(query) {
+    return new Promise((resolve, reject) => {
+        db.all(query, (err, rows) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(rows);
+            }
+        });
+    });
+}
+
+async function get_info() {
+    try {
+        const newPosts = await getDatabaseInfo("SELECT COUNT(id) as count FROM photos WHERE status = 'new'");
+        const acceptedPosts = await getDatabaseInfo("SELECT COUNT(id) as count FROM photos WHERE status = 'accepted'");
+        const rejectedPosts = await getDatabaseInfo("SELECT COUNT(id) as count FROM photos WHERE status = 'rejected'");
+        const delayedPosts = await getDatabaseInfo("SELECT COUNT(id) as count FROM photos WHERE status = 'delayed'");
+        const editingPosts = await getDatabaseInfo("SELECT COUNT(id) as count FROM photos WHERE status = 'edit'");
+
+        return `ÐÐ¾Ð²Ñ‹Ðµ Ð¿ÑƒÐ±Ð»Ð¸ÐºÐ°Ñ†Ð¸Ð¸: ${newPosts[0].count}\nÐŸÑ€Ð¸Ð½ÑÑ‚Ñ‹Ðµ: ${acceptedPosts[0].count}\nÐžÑ‚ÐºÐ»Ð¾Ð½ÐµÐ½Ð½Ñ‹Ðµ: ${rejectedPosts[0].count}\nÐžÑ‚Ð»Ð¾Ð¶ÐµÐ½Ð½Ñ‹Ðµ: ${delayedPosts[0].count}\nÐ•Ñ‰Ðµ Ð½Ðµ Ð³Ð¾Ñ‚Ð¾Ð²Ñ‹Ðµ: ${editingPosts[0].count}`;
+    } catch (err) {
+        console.error(err);
+        throw new Error('ÐŸÑ€Ð¾Ð¸Ð·Ð¾ÑˆÐ»Ð° Ð¾ÑˆÐ¸Ð±ÐºÐ° Ð¿Ñ€Ð¸ Ð¿Ð¾Ð»ÑƒÑ‡ÐµÐ½Ð¸Ð¸ Ð¸Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸Ð¸ Ð¸Ð· Ð±Ð°Ð·Ñ‹ Ð´Ð°Ð½Ð½Ñ‹Ñ….');
+    }
+}
+
+bot.command('info', async (ctx) => {
+    const user_id = ctx.from.id;
+    if (MODERS_LIST.includes(user_id)) {
+        try {
+            const response = await get_info();
+            ctx.reply(response);
+        } catch (error) {
+            ctx.reply(error.message);
+        }
+    } else {
+        ctx.reply('Ð£ Ð²Ð°Ñ Ð½ÐµÑ‚ Ð¿Ñ€Ð°Ð² Ð´Ð»Ñ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ñ ÑÑ‚Ð¾Ð¹ ÐºÐ¾Ð¼Ð°Ð½Ð´Ñ‹.');
+    }
+});
+
+
+
 bot.launch();
 
 process.once('SIGINT', () => bot.stop('SIGINT'));

@@ -17,6 +17,7 @@
   "eslintConfig": {},
   "dependencies": {
     "dotenv": "^16.3.1",
+    "sqlite3": "^5.1.6",
     "telegraf": "^4.15.3"
   }
 }
