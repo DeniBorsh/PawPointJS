@@ -161,7 +161,15 @@ async function moderate(ctx) {
                 // Формируем и отправляем сообщение с фото и кнопками
                 const google_maps_url = `https://www.google.com/maps/place/${lat}\,${lng}`;
                 const caption = `Автор: ${await get_username(uid)}\nОписание: ${description}\n[Местоположение](${google_maps_url})`;
-                ctx.replyWithPhoto(file_id, { caption, reply_markup: markup, parse_mode: 'Markdown' });
+                ctx.replyWithPhoto(file_id, {
+                    caption, parse_mode: 'Markdown', reply_markup: {
+                        inline_keyboard: [
+                            [{ text: "✅ Принять", callback_data: `accept_${request_id}` },
+                             { text: "❌ Отклонить", callback_data: `reject_${request_id}` },
+                             { text: "⏰ Отложить", callback_data: `delay_${request_id}` }]
+                        ]
+                    }
+                });
             } else {
                 ctx.reply("Нет постов, ожидающих модерации.");
             }
@@ -230,10 +238,16 @@ bot.on('text', (ctx) => {
 });
 function addDescription(ctx) {
     const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback('❌ Пропустить', 'noDescription')],
+        [Markup.button.callback('👀 Пропустить', 'noDescription')],
     ]);
 
-    ctx.reply("Теперь добавьте описание к фотографии", { reply_markup: keyboard, parse_mode: 'Markdown' });
+    bot.telegram.sendMessage(ctx.from.id, "Теперь добавьте описание к фотографии (опционально)", {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: "👀 Пропустить", callback_data: "noDescription" }],
+            ]
+        }
+    });
 }
 
 
