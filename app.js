@@ -14,6 +14,7 @@ const MODERS_LIST = [
     +process.env.WIROTENSHI,
     +process.env.GURMAN
 ];
+const CHANNEL_ID = +process.env.CHANNEL_ID
 
 const db = new sqlite3.Database('./data/database.db', sqlite3.OPEN_READWRITE, (err) => {
     if (err) console.error(err.message);
@@ -30,6 +31,7 @@ db.run(`CREATE TABLE IF NOT EXISTS photos (
     username TEXT
 )`);
 
+// Класс для реализации очереди новых публикаций
 class ModerationQueue {
     constructor() {
         this.queue = [];
@@ -41,6 +43,8 @@ class ModerationQueue {
 }
 
 const moderationQueue = new ModerationQueue();
+
+// Объест класса Map, который будет хранить ключи в виде user_id и значения в виде объекта из двух полей: file_id и state. State указывает текущий статус публикации в виде строки типа "await_{статус}"
 const userStates = new Map();
 
 // Функция для выполнения запроса и получения результатов
@@ -94,6 +98,7 @@ bot.hears('🗑️ Очистить фотографии', async (ctx) => cleanu
 bot.command('info', async (ctx) => get_info(ctx));
 bot.hears('📝 Информация о БД', async (ctx) => get_info(ctx));
 
+// Обработка фотографий. Каждая отправка фотографии генерирует новую публикацию, если нет незавершенной публикации
 bot.on('photo', async (ctx) => {
     const user_id = ctx.from.id;
     const userState = userStates.get(user_id) || {state: 'await_photo', file_id: null };
@@ -113,6 +118,7 @@ bot.on('photo', async (ctx) => {
     }
 });
 
+// Обработка отправки местоположения
 bot.on('location', async (ctx) => {
     const user_id = ctx.from.id;
     const userState = userStates.get(user_id);
@@ -133,13 +139,14 @@ bot.on('location', async (ctx) => {
 });
 
 // Добавление описания
-bot.on('text', (ctx) => {
+bot.on('text', async (ctx) => {
     const user_id = ctx.from.id;
     const userState = userStates.get(user_id);
 
     if (userState && userState.state === 'await_description') {
-        userStates.delete(user_id);
-        ctx.reply('Ваша публикация сохранена и отправлена на модерацию');
+        await runQuery('UPDATE photos SET description = ? WHERE file_id = ?', [ctx.message.text, userState.file_id]);
+        ctx.reply('Описание добавлено');
+        addUsername(ctx);
     } else {
         sendStateMessage(ctx);
     }
@@ -175,40 +182,55 @@ bot.action('complete', (ctx) => {
 
 // Обработка коллбеков для принятия
 bot.action(/accept_(.+)/, async (ctx) => {
-    runQuery('UPDATE photos SET status = ? WHERE id = ?', ['accepted', ctx.match[1]]);
-    try {
-        const photoInfo = await selectQuery("SELECT file_id, description, lat, lng, username FROM photos WHERE id = ?", [ctx.match[1]]);
-        if (photoInfo.length > 0) {
-            const { file_id, description, lat, lng, username } = photoInfo[0];
-            let caption = "";
-            if (username && username.length > 0) {
-                caption += `Автор: ${username}\n`;
-            }
-            if (description && description.length > 0) {
-                caption += `Комментарий автора: ${description}\n`;
-            }
+    const request_id = ctx.match[1];
+    if (checkIfProcessed(request_id)) {
+        runQuery('UPDATE photos SET status = ? WHERE id = ?', ['accepted', request_id]);
+        try {
+            const photoInfo = await selectQuery("SELECT file_id, description, lat, lng, username FROM photos WHERE id = ?", [request_id]);
+            if (photoInfo.length > 0) {
+                const { file_id, description, lat, lng, username } = photoInfo[0];
+                let caption = "";
+                if (username && username.length > 0) {
+                    caption += `Автор: ${username}\n`;
+                }
+                if (description && description.length > 0) {
+                    caption += `Комментарий автора: ${description}\n`;
+                }
 
-            const googleMapsUrl = `https://www.google.com/maps/place/${lat},${lng}`;
-            caption += `[Местоположение](${googleMapsUrl})`;
-            
-            ctx.replyWithPhoto(file_id, { caption, parse_mode: 'Markdown' });
+                const googleMapsUrl = `https://www.google.com/maps/place/${lat},${lng}`;
+                caption += `[Местоположение](${googleMapsUrl})`;
+
+                await bot.telegram.sendPhoto(CHANNEL_ID, file_id, { caption, parse_mode: 'Markdown' });
+            }
+            ctx.reply(`Заявка с ID ${request_id} принята`);
+        } catch (err) {
+            ctx.reply('Произошла ошибка при обработке запроса.');
         }
-    } catch (err) {
-        ctx.reply('Произошла ошибка при обработке запроса.');
+    } else {
+        ctx.reply('Этот пост уже обработан другим модератором');
     }
-    ctx.reply(`Заявка с ID ${ctx.match[1]} отложена`);
 });
 
 // Обработка коллбеков для отклонения
 bot.action(/reject_(.+)/, async (ctx) => {
-    runQuery('UPDATE photos SET status = ? WHERE id = ?', ['rejected', ctx.match[1]]);
-    ctx.reply(`Заявка с ID ${ctx.match[1]} отклонена`);
+    const request_id = ctx.match[1];
+    if (checkIfProcessed(request_id)) {
+        runQuery('UPDATE photos SET status = ? WHERE id = ?', ['rejected', request_id]);
+        ctx.reply(`Заявка с ID ${request_id} отклонена`);
+    } else {
+        ctx.reply('Этот пост уже обработан другим модератором');
+    }
 });
 
 // Обработка коллбеков для отложения
 bot.action(/delay_(.+)/, async (ctx) => {
-    runQuery('UPDATE photos SET status = ? WHERE id = ?', ['delayed', ctx.match[1]]);
-    ctx.reply(`Заявка с ID ${ctx.match[1]} отложена`);
+    const request_id = ctx.match[1];
+    if (checkIfProcessed(request_id)) {
+        runQuery('UPDATE photos SET status = ? WHERE id = ?', ['delayed', request_id]);
+        ctx.reply(`Заявка с ID ${request_id} отложена`);
+    } else {
+        ctx.reply('Этот пост уже обработан другим модератором');
+    }
 });
 
 bot.action('finish', (ctx) => finishPublication(ctx));
@@ -228,9 +250,24 @@ bot.action('usernameLink', async (ctx) => {
     addUrgency(ctx);
 });
 
+// Если нажата кнопка "Важно", публикация моментально отправляется всем модераторам
 bot.action('urgent', async (ctx) => {
     finishPublication(ctx);
-
+    const { id, user_id, description, lat, lng } = await selectQuery("SELECT id, user_id, description, lat, lng FROM photos WHERE status = 'new' OR status = 'delayed' AND file_id = ?", [ctx.from.id]); 
+    const google_maps_url = `https://www.google.com/maps/place/${lat}\,${lng}`;
+    const caption = `Автор: ${await getUsername(user_id)}\nОписание: ${description}\n[Местоположение](${google_maps_url})`;
+    const marup = [
+        [{ text: "✅ Принять", callback_data: `accept_${request_id}` },
+        { text: "❌ Отклонить", callback_data: `reject_${request_id}` }],
+        [{ text: "⏰ Отложить", callback_data: `delay_${request_id}` }]
+    ];
+    for (const ADMIN_ID of MODERS_LIST) {
+        bot.telegram.sendPhoto(ADMIN_ID, file_id, {
+            caption, parse_mode: 'Markdown', reply_markup: {
+                inline_keyboard: markup
+            }
+        });
+    }
 })
 
 // Функция начала модерации
@@ -246,13 +283,8 @@ async function moderate(ctx) {
             if (!moderationQueue.hasNext()) await moderationQueue.loadQueue();
 
             if (moderationQueue.hasNext()) {
-                const request = moderationQueue.getNext();
-                const request_id = request.id;
-                const user_id = request.user_id;
-                const file_id = request.file_id;
-                const description = request.description;
-                const lat = request.lat;
-                const lng = request.lng;
+                const { id, user_id, file_id, description, lat, lng } = moderationQueue.getNext();
+                const request_id = id;
                 const google_maps_url = `https://www.google.com/maps/place/${lat}\,${lng}`;
                 const caption = `Автор: ${await getUsername(user_id)}\nОписание: ${description}\n[Местоположение](${google_maps_url})`;
                
@@ -322,7 +354,7 @@ function sendStateMessage(ctx) {
 
 // Отправляются сообщения с колбек-кнопками
 function addDescription(ctx, message = 'Теперь добавьте описание к фотографии (опционально)') {
-    bot.telegram.sendMessage(ctx.from.id, message, {
+    ctx.reply(message, {
         reply_markup: {
             inline_keyboard: [
                 [{ text: '👀 Пропустить', callback_data: 'descriptionNone' }],
@@ -332,7 +364,8 @@ function addDescription(ctx, message = 'Теперь добавьте описа
 }
 
 function addUsername(ctx, message = 'Хотите ли вы, чтобы в посте отображалось ваше имя либо ссылка на ваш профиль?') {
-    bot.telegram.sendMessage(ctx.from.id, message, {
+    setState(ctx, 'await_username');
+    ctx.reply(message, {
         reply_markup: {
             inline_keyboard: [
                 [{ text: '❌ Нет', callback_data: 'usernameNone' },
@@ -344,7 +377,8 @@ function addUsername(ctx, message = 'Хотите ли вы, чтобы в по�
 }
 
 function addUrgency(ctx, message = 'Если животное требует срочного внимания, нажмите на соответствующую кнопку') {
-    bot.telegram.sendMessage(ctx.from.id, message, {
+    setState(ctx, 'await_urgency');
+    ctx.reply(message, {
         reply_markup: {
             inline_keyboard: [
                 [{ text: '✅ Завершить', callback_data: 'finish' },
@@ -356,10 +390,11 @@ function addUrgency(ctx, message = 'Если животное требует с�
 
 // Завершить обновление базы данных
 async function finishPublication(ctx) {
-    const user_id = ctx.from.id;
+    const user_id = ctx.from.id;F
     const userState = userStates.get(user_id);
     if (userState) {
         await runQuery('UPDATE photos SET status = ? WHERE file_id = ?', ['new', userState.file_id]);
+        userStates.delete(user_id);
         ctx.reply('Публикация успешно сохранена!');
     }
     else ctx.reply('Не удалось отправить публикацию. Попробуйте снова');
@@ -373,6 +408,18 @@ async function getUsername(userId) {
     } catch (err) {
         return ""; 
     }
+}
+
+function setState(ctx, newState) {
+    const userId = ctx.from.id;
+    const userState = userStates.get(userId);
+    userState.state = newState;
+    userStates.set(userId, userState);
+}
+
+async function checkIfProcessed(request_id) {
+    const request = await selectQuery('SELECT status FROM photos WHERE id = ?', [request_id]);
+    return request && ['new', 'delayed'].includes(request.status);
 }
 
 
