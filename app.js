@@ -57,7 +57,6 @@ function selectQuery(query, params = []) {
                 console.error("Ошибка SQLite:", err);
                 reject(err);
             } else {
-                console.log("Результат запроса:", rows);
                 resolve(rows);
             }
         });
@@ -254,6 +253,7 @@ bot.action('usernameLink', async (ctx) => {
 bot.action('urgent', async (ctx) => {
     finishPublication(ctx);
     const { id, user_id, description, lat, lng } = await selectQuery("SELECT id, user_id, description, lat, lng FROM photos WHERE status = 'new' OR status = 'delayed' AND file_id = ?", [ctx.from.id]); 
+    const request_id = id;
     const google_maps_url = `https://www.google.com/maps/place/${lat}\,${lng}`;
     const caption = `Автор: ${await getUsername(user_id)}\nОписание: ${description}\n[Местоположение](${google_maps_url})`;
     const marup = [
