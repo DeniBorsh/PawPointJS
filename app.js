@@ -16,9 +16,9 @@ const MODERS_LIST = [
 ];
 const CHANNEL_ID = +process.env.CHANNEL_ID
 
-const db = new sqlite3.Database('./data/database.db', sqlite3.OPEN_READWRITE, (err) => {
+const db = new sqlite3.Database('./data/database.db?v=1702145556132', sqlite3.OPEN_READWRITE, (err) => {
     if (err) console.error(err.message);
-}); 
+});
 
 db.run(`CREATE TABLE IF NOT EXISTS photos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +37,7 @@ class ModerationQueue {
         this.queue = [];
     }
 
-    async loadQueue() { this.queue = await selectQuery("SELECT id, user_id, file_id, description, lat, lng FROM photos WHERE status = 'new' OR status = 'delayed'")}
+    async loadQueue() { this.queue = await selectQuery("SELECT id, user_id, file_id, description, lat, lng FROM photos WHERE status = 'new' OR status = 'delayed'") }
     hasNext() { return this.queue.length > 0; }
     getNext() { return this.queue.shift(); }
 }
@@ -80,7 +80,7 @@ bot.start((ctx) => {
     if (MODERS_LIST.includes(user_id)) {
         const keyboard = Markup.keyboard([
             ['🛡️ Модерация', '🗑️ Очистить фотографии'],
-            ['📝 Информация о БД'] 
+            ['📝 Информация о БД']
         ]).resize();
         ctx.reply(`Привет, администратор ${ctx.from.first_name}!`, keyboard);
     } else {
@@ -100,7 +100,7 @@ bot.hears('📝 Информация о БД', async (ctx) => get_info(ctx));
 // Обработка фотографий. Каждая отправка фотографии генерирует новую публикацию, если нет незавершенной публикации
 bot.on('photo', async (ctx) => {
     const user_id = ctx.from.id;
-    const userState = userStates.get(user_id) || {state: 'await_photo', file_id: null };
+    const userState = userStates.get(user_id) || { state: 'await_photo', file_id: null };
 
     if (userState.state === 'await_photo') {
         userState.file_id = ctx.message.photo[0].file_id;
@@ -176,7 +176,7 @@ bot.action('complete', (ctx) => {
             addUsername(ctx);
         else if (userState.state === 'await_urgency')
             addUrgency(ctx);
-    } 
+    }
 });
 
 // Обработка коллбеков для принятия
@@ -204,6 +204,7 @@ bot.action(/accept_(.+)/, async (ctx) => {
             ctx.reply(`Заявка с ID ${request_id} принята`);
         } catch (err) {
             ctx.reply('Произошла ошибка при обработке запроса.');
+            console.error(err);
         }
     } else {
         ctx.reply('Этот пост уже обработан другим модератором');
@@ -254,7 +255,7 @@ bot.action('urgent', async (ctx) => {
     const user_id = ctx.from.id;
     const userState = userStates.get(user_id);
     finishPublication(ctx);
-    const { id, description, lat, lng } = await selectQuery("SELECT id, description, lat, lng FROM photos WHERE status = 'new' OR status = 'delayed' AND file_id = ?", [userState.file_id]); 
+    const { id, description, lat, lng } = await selectQuery("SELECT id, description, lat, lng FROM photos WHERE status = 'new' OR status = 'delayed' AND file_id = ?", [userState.file_id]);
     const request_id = id;
     const google_maps_url = `https://www.google.com/maps/place/${lat}\,${lng}`;
     const caption = `Автор: ${await getUsername(user_id)}\nОписание: ${description}\n[Местоположение](${google_maps_url})`;
@@ -289,13 +290,13 @@ async function moderate(ctx) {
                 const request_id = id;
                 const google_maps_url = `https://www.google.com/maps/place/${lat}\,${lng}`;
                 const caption = `Автор: ${await getUsername(user_id)}\nОписание: ${description}\n[Местоположение](${google_maps_url})`;
-               
+
                 ctx.replyWithPhoto(file_id, {
                     caption, parse_mode: 'Markdown', reply_markup: {
                         inline_keyboard: [
                             [{ text: "✅ Принять", callback_data: `accept_${request_id}` },
-                             { text: "❌ Отклонить", callback_data: `reject_${request_id}` }],
-                             [{ text: "⏰ Отложить", callback_data: `delay_${request_id}` }]
+                            { text: "❌ Отклонить", callback_data: `reject_${request_id}` }],
+                            [{ text: "⏰ Отложить", callback_data: `delay_${request_id}` }]
                         ]
                     }
                 });
@@ -349,7 +350,7 @@ function sendStateMessage(ctx) {
 
     if (!userState || userState.state === 'await_photo') ctx.reply('Пожалуйста, отправьте фотографию уличного животного');
     else if (userState.state === 'await_location') ctx.reply('Пожалуйста, пришлите местоположение в виде геоданных');
-    else if (userState.state === 'await_description') addDescription('Пожалуйста, напишите текстовое описание'); 
+    else if (userState.state === 'await_description') addDescription('Пожалуйста, напишите текстовое описание');
     else if (userState.state === 'await_username') ctx.reply('Пожалуйста, выберите настройку отображение имени');
     else if (userState.state === 'await_urgency') ctx.reply('Пожалуйста, выберите параметр срочности публикации');
 }
@@ -371,8 +372,8 @@ function addUsername(ctx, message = 'Хотите ли вы, чтобы в по�
         reply_markup: {
             inline_keyboard: [
                 [{ text: '❌ Нет', callback_data: 'usernameNone' },
-                 { text: '🗿 Имя', callback_data: 'usernameName' },
-                 { text: '🔗 Ссылка', callback_data: 'usernameLink' }],
+                { text: '🗿 Имя', callback_data: 'usernameName' },
+                { text: '🔗 Ссылка', callback_data: 'usernameLink' }],
             ]
         }
     });
@@ -384,7 +385,7 @@ function addUrgency(ctx, message = 'Если животное требует с�
         reply_markup: {
             inline_keyboard: [
                 [{ text: '✅ Завершить', callback_data: 'finish' },
-                 { text: '❗️ Срочно', callback_data: 'urgent' }]
+                { text: '❗️ Срочно', callback_data: 'urgent' }]
             ]
         }
     });
@@ -408,7 +409,7 @@ async function getUsername(userId) {
         const chat = await bot.telegram.getChat(userId);
         return chat.username ? `@${chat.username}` : ""; chat.first_name;
     } catch (err) {
-        return ""; 
+        return "";
     }
 }
 
