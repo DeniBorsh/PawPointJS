@@ -237,22 +237,24 @@ bot.action('descriptionNone', (ctx) => addUsername(ctx));
 bot.action('usernameNone', (ctx) => addUrgency(ctx));
 
 bot.action('usernameName', async (ctx) => {
-    const file_id = userStates.get(ctx.from.id);
-    await runQuery('UPDATE photos SET username = ? WHERE file_id = ?', [ctx.from.first_name, file_id]);
+    const userState = userStates.get(ctx.from.id);
+    await runQuery('UPDATE photos SET username = ? WHERE file_id = ?', [ctx.from.first_name, userState.file_id]);
     addUrgency(ctx);
 });
 
 bot.action('usernameLink', async (ctx) => {
-    const file_id = userStates.get(ctx.from.id);
+    const userState = userStates.get(ctx.from.id);
     const username = ctx.from.username ? `@${ctx.from.username}` : ctx.from.first_name;
-    await runQuery('UPDATE photos SET username = ? WHERE file_id = ?', [username, file_id]);
+    await runQuery('UPDATE photos SET username = ? WHERE file_id = ?', [username, userState.file_id]);
     addUrgency(ctx);
 });
 
 // Если нажата кнопка "Важно", публикация моментально отправляется всем модераторам
 bot.action('urgent', async (ctx) => {
+    const user_id = ctx.from.id;
+    const userState = userStates.get(user_id);
     finishPublication(ctx);
-    const { id, user_id, description, lat, lng } = await selectQuery("SELECT id, user_id, description, lat, lng FROM photos WHERE status = 'new' OR status = 'delayed' AND file_id = ?", [ctx.from.id]); 
+    const { id, description, lat, lng } = await selectQuery("SELECT id, description, lat, lng FROM photos WHERE status = 'new' OR status = 'delayed' AND file_id = ?", [userState.file_id]); 
     const request_id = id;
     const google_maps_url = `https://www.google.com/maps/place/${lat}\,${lng}`;
     const caption = `Автор: ${await getUsername(user_id)}\nОписание: ${description}\n[Местоположение](${google_maps_url})`;
