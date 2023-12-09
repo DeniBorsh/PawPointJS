@@ -183,7 +183,6 @@ bot.action('complete', (ctx) => {
 bot.action(/accept_(.+)/, async (ctx) => {
     const request_id = ctx.match[1];
     if (checkIfProcessed(request_id)) {
-        runQuery('UPDATE photos SET status = ? WHERE id = ?', ['accepted', request_id]);
         try {
             const photoInfo = await selectQuery("SELECT file_id, description, lat, lng, username FROM photos WHERE id = ?", [request_id]);
             if (photoInfo.length > 0) {
@@ -200,6 +199,7 @@ bot.action(/accept_(.+)/, async (ctx) => {
                 caption += `[Местоположение](${googleMapsUrl})`;
 
                 await bot.telegram.sendPhoto(CHANNEL_ID, file_id, { caption, parse_mode: 'Markdown' });
+                await runQuery('UPDATE photos SET status = ? WHERE id = ?', ['accepted', request_id]);
             }
             ctx.reply(`Заявка с ID ${request_id} принята`);
         } catch (err) {
