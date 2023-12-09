@@ -392,7 +392,7 @@ function addUrgency(ctx, message = 'Если животное требует с�
 
 // Завершить обновление базы данных
 async function finishPublication(ctx) {
-    const user_id = ctx.from.id;F
+    const user_id = ctx.from.id;
     const userState = userStates.get(user_id);
     if (userState) {
         await runQuery('UPDATE photos SET status = ? WHERE file_id = ?', ['new', userState.file_id]);
