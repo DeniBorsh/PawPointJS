@@ -16,7 +16,7 @@ const MODERS_LIST = [
 ];
 const CHANNEL_ID = +process.env.CHANNEL_ID
 
-const db = new sqlite3.Database('./data/database.db?v=1702145556132', sqlite3.OPEN_READWRITE, (err) => {
+const db = new sqlite3.Database('./data/database.db', sqlite3.OPEN_READWRITE, (err) => {
     if (err) console.error(err.message);
 });
 
